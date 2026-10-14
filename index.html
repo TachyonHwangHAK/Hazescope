@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HazeScope SG — Singapore &amp; regional haze monitor</title>
+<meta name="description" content="Live Singapore PSI and PM2.5 from NEA, cross-checked with MSS weather and regional haze model data, with a voice assistant in English and 华语.">
+<meta name="theme-color" content="#0c1524">
+<meta name="color-scheme" content="dark light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api-open.data.gov.sg" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400..700&display=swap">
+<link rel="stylesheet" href="assets/css/app.css">
+<script>
+  // Apply saved theme/language before first paint to avoid a flash.
+  (function () {
+    try {
+      var s = JSON.parse(localStorage.getItem('hazescope.v1.settings') || '{}');
+      var th = ['light', 'dark', 'colourful', 'glass'].indexOf(s.theme) >= 0 ? s.theme : 'dark';
+      document.documentElement.setAttribute('data-theme', th);
+      if (s.lang === 'zh') document.documentElement.setAttribute('lang', 'zh-Hans-SG');
+    } catch (e) {}
+  })();
+</script>
+<script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="m19.4 13.5.1-1.5-.1-1.5 2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.6 7.6 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6-.1 1.5.1 1.5-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.6Z"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.4-1.3-1.7-1.3-3 0-1 .8-1.8 1.8-1.8h2.2A4.5 4.5 0 0 0 21 9.9C21 6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.3" fill="currentColor"/><circle cx="10.5" cy="7" r="1.3" fill="currentColor"/><circle cx="15.5" cy="7.5" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m16 9.5 5 5m0-5-5 5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M20 11a8 8 0 0 0-14.3-4.6L4 8.5M4 4v4.5h4.5M4 13a8 8 0 0 0 14.3 4.6L20 15.5M20 20v-4.5h-4.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 12 20 4l-4.5 16-3.5-6.5L4 12Zm8 1.5L20 4"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
+    <symbol id="i-now" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="m3.5 6.5 5.5-2.5 6 2.5 5.5-2.5v13.5L15 20l-6-2.5-5.5 2.5zM9 4v13.5M15 6.5V20"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 4v16h16M7.5 15l3.5-4.5 3 2.5 5-6.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 3 4.5 6v5.5c0 4.5 3.2 8 7.5 9.5 4.3-1.5 7.5-5 7.5-9.5V6z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="m8.8 12 2.2 2.2 4.3-4.4"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3.5 12h17M12 3.5c2.5 2.5 3.6 5.5 3.6 8.5S14.5 18 12 20.5C9.5 18 8.4 15 8.4 12S9.5 6 12 3.5Z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 20s-7.5-4.4-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.6 12 20 12 20Z"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M7 12h2.5l1.2-2 2 4 1.3-2H17"/></symbol>
+    <symbol id="i-wind" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7"/></symbol>
+    <symbol id="i-temp" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0Z"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 9v7"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 3.5s6 6.5 6 10.5a6 6 0 0 1-12 0c0-4 6-10.5 6-10.5Z"/></symbol>
+    <symbol id="i-rain" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M7 15.5a4 4 0 0 1-.4-8A5.5 5.5 0 0 1 17.2 8a3.8 3.8 0 0 1-.2 7.5Z"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m8.5 18-1 2.5M12.5 18l-1 2.5M16.5 18l-1 2.5"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 9.5a4.3 4.3 0 0 1-.5 8.5Z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 11v5.5M12 7.6v.1"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14Zm0 0 7-7"/></symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 4 2.8 19.5h18.4Z"/><path stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 10v4.5M12 17.2v.1"/></symbol>
+    <symbol id="i-alert2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 7.5v5.5M12 16.3v.1"/></symbol>
+    <symbol id="i-skull" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3Z"/><path stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="m9 9 6 6m0-6-6 6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13l10.5-6.5Z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5Zm6.5 12c.3 2 1.2 3 3 3.3-1.8.3-2.7 1.3-3 3.2-.3-1.9-1.2-2.9-3-3.2 1.8-.3 2.7-1.3 3-3.3Z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.8 4.5 5.8v5.7c0 4.6 3.2 8.3 7.5 9.7 4.3-1.4 7.5-5.1 7.5-9.7V5.8Z" opacity=".95"/></symbol>
+    <symbol id="i-swirl" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M3.5 9.5h10.5a2.7 2.7 0 1 0-2.6-3.3M3.5 13.5h14.5a3 3 0 1 1-2.9 3.7M6 17.5h5"/></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5 20a7 7 0 0 1 14 0"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip-link" href="#main" data-i18n="a11y.skip">Skip to content</a>
+<div class="backdrop" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+
+<header class="topbar" id="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="2.5" opacity=".35"/>
+      <path d="M8 22c4-3 8-3 12 0s8 3 12 0" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M11 15.5c3-2 6-2 9 0s6 2 9 0" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".7"/>
+      <path d="M13 28.5c2.4-1.5 4.7-1.5 7 0s4.6 1.5 7 0" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".5"/>
+    </svg>
+    <div class="brand-text">
+      <span class="brand-name">HazeScope SG</span>
+      <span class="brand-sub" data-i18n="brand.sub">Haze monitor · Singapore &amp; region</span>
+    </div>
+  </div>
+
+  <nav class="secnav" aria-label="Sections" data-i18n-attr="aria-label:nav.label">
+    <a href="#now" data-nav="now" data-i18n="nav.now">Now</a>
+    <a href="#map-section" data-nav="map-section" data-i18n="nav.map">Map</a>
+    <a href="#trends-section" data-nav="trends-section" data-i18n="nav.trends">Trends</a>
+    <a href="#xref-section" data-nav="xref-section" data-i18n="nav.xref">Cross-check</a>
+    <a href="#regional-section" data-nav="regional-section" data-i18n="nav.region">Region</a>
+    <a href="#advice-section" data-nav="advice-section" data-i18n="nav.advice">Advice</a>
+  </nav>
+
+  <div class="top-actions">
+    <button class="status-pill" id="status-pill" type="button" aria-describedby="status-detail">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="status-text" id="status-text">Connecting…</span>
+      <span class="status-count" id="status-count"></span>
+    </button>
+    <button class="icon-btn lang-btn" id="lang-btn" type="button" aria-label="Switch language" data-i18n-attr="aria-label:top.lang">
+      <span class="lang-glyph" id="lang-glyph">华</span>
+    </button>
+    <div class="menu-wrap">
+      <button class="icon-btn" id="theme-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Theme" data-i18n-attr="aria-label:top.theme"><svg><use href="#i-palette"/></svg></button>
+      <div class="menu" id="theme-menu" role="menu" hidden>
+        <button role="menuitemradio" data-theme-opt="dark"><span class="sw sw-dark"></span><span data-i18n="theme.dark">Dark</span></button>
+        <button role="menuitemradio" data-theme-opt="light"><span class="sw sw-light"></span><span data-i18n="theme.light">Light</span></button>
+        <button role="menuitemradio" data-theme-opt="colourful"><span class="sw sw-colourful"></span><span data-i18n="theme.colourful">Colourful</span></button>
+        <button role="menuitemradio" data-theme-opt="glass"><span class="sw sw-glass"></span><span data-i18n="theme.glass">Glass</span></button>
+      </div>
+    </div>
+    <button class="icon-btn" id="voice-btn" type="button" aria-pressed="true" aria-label="Voice" data-i18n-attr="aria-label:top.voice"><svg><use href="#i-volume"/></svg></button>
+    <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" data-i18n-attr="aria-label:top.settings"><svg><use href="#i-gear"/></svg></button>
+  </div>
+</header>
+
+<main id="main">
+  <section id="now" class="hero" aria-labelledby="hero-title">
+    <canvas id="sky" aria-hidden="true"></canvas>
+    <div class="hero-inner">
+      <div class="hero-head">
+        <h1 id="hero-title" data-i18n="hero.title">Singapore air right now</h1>
+        <p class="hero-clock"><span id="hero-date"></span> <time id="hero-clock" aria-live="off">--:--:--</time> <span data-i18n="hero.sgt">SGT</span></p>
+      </div>
+      <div class="hero-grid">
+        <div class="reading reading-psi" id="reading-psi">
+          <p class="reading-label"><span data-i18n="hero.psi">24-hour PSI</span> <span class="reading-hint" data-i18n="hero.psiHint">highest of 5 regions</span></p>
+          <p class="reading-value is-empty"><span class="num" id="psi-value"></span></p>
+          <p class="band-chip" id="psi-band" data-band="none"><svg><use href="#i-circle"/></svg><span>—</span></p>
+          <p class="reading-sub" id="psi-sub">&nbsp;</p>
+        </div>
+        <div class="reading reading-pm" id="reading-pm">
+          <p class="reading-label"><span data-i18n="hero.pm">1-hour PM2.5</span> <span class="reading-hint" data-i18n="hero.pmHint">µg/m³, for activities now</span></p>
+          <p class="reading-value is-empty"><span class="num" id="pm-value"></span></p>
+          <p class="band-chip" id="pm-band" data-band="none"><svg><use href="#i-circle"/></svg><span>—</span></p>
+          <p class="reading-sub" id="pm-sub">&nbsp;</p>
+        </div>
+      </div>
+      <div class="scale is-empty" id="psi-scale" aria-hidden="true">
+        <div class="scale-track"><span style="--w:12.5%;--c:#22a65a"></span><span style="--w:12.5%;--c:#3b8fd9"></span><span style="--w:25%;--c:#e9a823"></span><span style="--w:25%;--c:#ec7a3a"></span><span style="--w:25%;--c:#d33b3b"></span></div>
+        <div class="scale-marker" id="scale-marker"><span></span></div>
+        <div class="scale-ticks"><span style="left:0">0</span><span style="left:12.5%">50</span><span style="left:25%">100</span><span style="left:50%">200</span><span style="left:75%">300</span><span style="left:100%">400</span></div>
+      </div>
+      <p class="hero-advice" id="hero-advice" aria-live="polite"></p>
+      <p class="hero-meta" id="hero-meta"></p>
+    </div>
+  </section>
+
+  <div class="notice" id="demo-banner" hidden>
+    <svg><use href="#i-info"/></svg>
+    <p data-i18n="demo.banner">You are viewing demo data. These numbers are synthetic and not real air-quality readings.</p>
+    <button type="button" class="btn btn-ghost" id="demo-exit" data-i18n="demo.exit">Switch to live data</button>
+  </div>
+  <div class="notice notice-error" id="empty-state" hidden>
+    <svg><use href="#i-alert2"/></svg>
+    <div>
+      <p class="notice-title" data-i18n="empty.title">Live readings could not be loaded</p>
+      <p id="empty-detail" data-i18n="empty.body">Check your connection. HazeScope retries automatically at the next update.</p>
+    </div>
+    <div class="notice-actions">
+      <button type="button" class="btn" id="empty-retry" data-i18n="empty.retry">Try again</button>
+      <button type="button" class="btn btn-ghost" id="empty-demo" data-i18n="empty.demo">Preview with demo data</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section id="map-section" class="panel panel-map" aria-labelledby="map-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="map-title" data-i18n="map.title">Where the haze is</h2>
+          <p class="panel-desc" id="map-desc" data-i18n="map.descSg">24-hour PSI by NEA region, with the current MSS wind.</p>
+        </div>
+        <div class="seg" role="tablist" aria-label="Map view" data-i18n-attr="aria-label:map.view" id="map-seg">
+          <button role="tab" aria-selected="true" data-view="sg" data-i18n="map.sg">Singapore</button>
+          <button role="tab" aria-selected="false" data-view="region" data-i18n="map.region">Region</button>
+          <span class="seg-thumb" aria-hidden="true"></span>
+        </div>
+      </header>
+      <div class="map-wrap">
+        <div id="map" class="map" role="region" aria-label="Map" data-i18n-attr="aria-label:map.aria"></div>
+        <div class="map-fallback" id="map-fallback" hidden>
+          <svg><use href="#i-map"/></svg>
+          <p data-i18n="map.fallback">The map could not load. Readings are listed beside it.</p>
+        </div>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+      <ul class="region-list" id="region-list" aria-label="Regions"></ul>
+    </section>
+
+    <section id="weather-section" class="panel panel-weather" aria-labelledby="wx-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="wx-title" data-i18n="wx.title">Weather that moves the haze</h2>
+          <p class="panel-desc" data-i18n="wx.desc">Island-wide MSS station averages.</p>
+        </div>
+      </header>
+      <div class="wx-wind">
+        <svg class="compass" id="compass" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="52" class="compass-ring"/>
+          <g class="compass-ticks" id="compass-ticks"></g>
+          <text x="60" y="20" class="compass-n">N</text>
+          <g id="compass-arrow"><path d="M60 22 L68 44 L60 39 L52 44 Z" class="compass-head"/><line x1="60" y1="40" x2="60" y2="98" class="compass-shaft"/></g>
+          <circle cx="60" cy="60" r="4" class="compass-hub"/>
+        </svg>
+        <div class="wx-wind-text">
+          <p class="wx-big"><span id="wind-from">—</span></p>
+          <p class="wx-small" id="wind-detail">&nbsp;</p>
+        </div>
+      </div>
+      <dl class="wx-stats">
+        <div><dt><svg><use href="#i-temp"/></svg><span data-i18n="wx.temp">Temperature</span></dt><dd><span class="num" id="wx-temp">—</span><span class="unit">°C</span></dd></div>
+        <div><dt><svg><use href="#i-drop"/></svg><span data-i18n="wx.rh">Humidity</span></dt><dd><span class="num" id="wx-rh">—</span><span class="unit">%</span></dd></div>
+        <div><dt><svg><use href="#i-rain"/></svg><span data-i18n="wx.rain">Rain now</span></dt><dd id="wx-rain">—</dd></div>
+      </dl>
+      <div class="wx-fc">
+        <p class="wx-fc-title"><svg><use href="#i-cloud"/></svg><span data-i18n="wx.fc2">Next 2 hours</span></p>
+        <p class="wx-fc-main" id="fc2-main">—</p>
+        <p class="wx-fc-sub" id="fc2-sub">&nbsp;</p>
+        <p class="wx-fc-title"><svg><use href="#i-cloud"/></svg><span data-i18n="wx.fc24">24-hour outlook</span></p>
+        <p class="wx-fc-main" id="fc24-main">—</p>
+        <p class="wx-fc-sub" id="fc24-sub">&nbsp;</p>
+      </div>
+    </section>
+
+    <section id="trends-section" class="panel panel-trends" aria-labelledby="trend-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="trend-title" data-i18n="trend.title">Last 24 hours</h2>
+          <p class="panel-desc" id="trend-desc" data-i18n="trend.descPsi">24-hour PSI per region, hourly from NEA.</p>
+        </div>
+        <div class="seg" role="tablist" aria-label="Metric" data-i18n-attr="aria-label:trend.metric" id="trend-seg">
+          <button role="tab" aria-selected="true" data-metric="psi">PSI</button>
+          <button role="tab" aria-selected="false" data-metric="pm">PM2.5</button>
+          <span class="seg-thumb" aria-hidden="true"></span>
+        </div>
+      </header>
+      <div class="chart-legend" id="chart-legend"></div>
+      <div class="chart" id="chart"></div>
+      <details class="table-toggle">
+        <summary data-i18n="trend.table">Show as table</summary>
+        <div class="table-scroll" id="chart-table"></div>
+      </details>
+    </section>
+
+    <section id="xref-section" class="panel panel-xref" aria-labelledby="xref-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="xref-title" data-i18n="xref.title">Cross-check</h2>
+          <p class="panel-desc" data-i18n="xref.desc">How NEA readings line up with MSS weather and the regional model.</p>
+        </div>
+      </header>
+      <ul class="xref-list" id="xref-list"></ul>
+      <p class="fineprint" data-i18n="xref.note">These checks are rules of thumb, not a smoke-dispersion model. NEA readings remain the official reference.</p>
+    </section>
+
+    <section id="regional-section" class="panel panel-regional" aria-labelledby="reg-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="reg-title" data-i18n="reg.title">Around the region</h2>
+          <p class="panel-desc" data-i18n="reg.desc">Modelled PM2.5 from CAMS via Open-Meteo. Estimates, not station measurements.</p>
+        </div>
+      </header>
+      <div class="table-scroll">
+        <table class="reg-table" id="reg-table">
+          <thead><tr>
+            <th scope="col" data-i18n="reg.place">Place</th>
+            <th scope="col" class="r" data-i18n="reg.pm">PM2.5</th>
+            <th scope="col" data-i18n="reg.level">Level</th>
+            <th scope="col" class="r" data-i18n="reg.aqi">US AQI</th>
+            <th scope="col" class="r" data-i18n="reg.dist">From SG</th>
+            <th scope="col" data-i18n="reg.next">Next 24 h</th>
+          </tr></thead>
+          <tbody id="reg-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="advice-section" class="panel panel-advice" aria-labelledby="adv-title">
+      <header class="panel-head">
+        <div>
+          <h2 id="adv-title" data-i18n="adv.title">What to do</h2>
+          <p class="panel-desc" data-i18n="adv.desc">MOH and NEA guidance by 24-hour PSI. Your current band is highlighted.</p>
+        </div>
+      </header>
+      <div class="table-scroll">
+        <table class="adv-table" id="adv-table">
+          <thead><tr>
+            <th scope="col" data-i18n="adv.psi">24-hr PSI</th>
+            <th scope="col" data-i18n="adv.healthy">Healthy persons</th>
+            <th scope="col" data-i18n="adv.vulnerable">Elderly, pregnant women, children</th>
+            <th scope="col" data-i18n="adv.chronic">Chronic lung or heart disease</th>
+          </tr></thead>
+          <tbody id="adv-body"></tbody>
+        </table>
+      </div>
+      <ul class="adv-notes">
+        <li data-i18n="adv.note1">Use the 1-hour PM2.5 reading for decisions right now, such as going for a run. Use the 24-hour PSI for planning the next day.</li>
+        <li data-i18n="adv.note2">N95 masks are not needed for short exposures such as walking to a bus stop. Healthy persons: consider one when PSI is forecast above 300; persons with chronic lung or heart disease: above 200.</li>
+        <li data-i18n="adv.note3">Seek medical attention if you feel unwell. In an emergency, call 995.</li>
+      </ul>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <div>
+      <p class="footer-title" data-i18n="foot.sources">Data sources</p>
+      <ul class="sources" id="sources-list"></ul>
+    </div>
+    <div>
+      <p class="footer-title" data-i18n="foot.about">About these numbers</p>
+      <p data-i18n="foot.disclaimer">HazeScope SG is an independent viewer of public data and is not affiliated with NEA or MSS. For official advisories, refer to haze.gov.sg and weather.gov.sg.</p>
+      <p class="fineprint" id="foot-attrib" data-i18n-html="foot.attrib">Air quality and weather: NEA &amp; MSS via data.gov.sg (Singapore Open Data Licence). Regional model: Copernicus Atmosphere Monitoring Service (CAMS) via Open-Meteo. Map: OpenStreetMap contributors, CARTO.</p>
+      <p class="fineprint">HazeScope SG v<span id="app-version">1.0.0</span></p>
+    </div>
+  </footer>
+</main>
+
+<nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:nav.label">
+  <a href="#now" data-nav="now"><svg><use href="#i-now"/></svg><span data-i18n="nav.now">Now</span></a>
+  <a href="#map-section" data-nav="map-section"><svg><use href="#i-map"/></svg><span data-i18n="nav.map">Map</span></a>
+  <a href="#trends-section" data-nav="trends-section"><svg><use href="#i-chart"/></svg><span data-i18n="nav.trends">Trends</span></a>
+  <a href="#xref-section" data-nav="xref-section"><svg><use href="#i-check"/></svg><span data-i18n="nav.xrefShort">Check</span></a>
+  <a href="#advice-section" data-nav="advice-section"><svg><use href="#i-heart"/></svg><span data-i18n="nav.advice">Advice</span></a>
+</nav>
+
+<button class="assistant-fab" id="assistant-fab" type="button" aria-haspopup="dialog" aria-controls="assistant" aria-label="Open assistant" data-i18n-attr="aria-label:asst.open">
+  <span class="orb" id="fab-orb"><svg><use href="#i-shield"/></svg></span>
+  <span class="fab-label" id="fab-label">AetherGuard</span>
+</button>
+
+<aside class="sheet assistant" id="assistant" role="dialog" aria-modal="false" aria-labelledby="asst-name" hidden>
+  <header class="sheet-head asst-head">
+    <span class="orb orb-lg" id="asst-orb"><svg><use href="#i-shield"/></svg></span>
+    <div class="asst-id">
+      <p class="asst-name" id="asst-name">AetherGuard</p>
+      <p class="asst-role" id="asst-role"></p>
+    </div>
+    <button class="icon-btn" id="asst-speak" type="button" aria-pressed="true" aria-label="Voice" data-i18n-attr="aria-label:top.voice"><svg><use href="#i-volume"/></svg></button>
+    <button class="icon-btn" id="asst-close" type="button" aria-label="Close" data-i18n-attr="aria-label:common.close"><svg><use href="#i-close"/></svg></button>
+  </header>
+  <div class="persona-switch" id="persona-switch" role="radiogroup" aria-label="Assistant" data-i18n-attr="aria-label:asst.choose"></div>
+  <div class="chat" id="chat" role="log" aria-live="polite"></div>
+  <div class="chips" id="chips"></div>
+  <form class="composer" id="composer" autocomplete="off">
+    <label class="sr-only" for="chat-input" data-i18n="asst.inputLabel">Ask about the haze</label>
+    <input id="chat-input" type="text" maxlength="300" placeholder="Ask about the haze…" data-i18n-attr="placeholder:asst.placeholder">
+    <button class="icon-btn" id="mic-btn" type="button" aria-label="Speak" data-i18n-attr="aria-label:asst.mic" hidden><svg><use href="#i-mic"/></svg></button>
+    <button class="icon-btn send-btn" type="submit" aria-label="Send" data-i18n-attr="aria-label:asst.send"><svg><use href="#i-send"/></svg></button>
+  </form>
+  <p class="fineprint asst-disclaimer" data-i18n="asst.disclaimer">Answers come from the live readings on this page and NEA/MOH guidance. Not medical advice.</p>
+</aside>
+
+<aside class="sheet settings" id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+  <header class="sheet-head">
+    <h2 id="settings-title" data-i18n="set.title">Settings</h2>
+    <button class="icon-btn" id="settings-close" type="button" aria-label="Close" data-i18n-attr="aria-label:common.close"><svg><use href="#i-close"/></svg></button>
+  </header>
+  <div class="sheet-body">
+    <fieldset class="field">
+      <legend data-i18n="set.lang">Language</legend>
+      <div class="seg seg-wide" id="set-lang">
+        <button type="button" data-lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="zh" aria-pressed="false">华语</button>
+        <span class="seg-thumb" aria-hidden="true"></span>
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.theme">Theme</legend>
+      <div class="theme-grid" id="set-theme">
+        <button type="button" data-theme-opt="dark"><span class="sw sw-dark"></span><span data-i18n="theme.dark">Dark</span></button>
+        <button type="button" data-theme-opt="light"><span class="sw sw-light"></span><span data-i18n="theme.light">Light</span></button>
+        <button type="button" data-theme-opt="colourful"><span class="sw sw-colourful"></span><span data-i18n="theme.colourful">Colourful</span></button>
+        <button type="button" data-theme-opt="glass"><span class="sw sw-glass"></span><span data-i18n="theme.glass">Glass</span></button>
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.interval">Fetch new data every</legend>
+      <select id="set-interval" class="select"></select>
+      <p class="field-help" data-i18n="set.intervalHelp">The clock and countdown update every second. NEA publishes PSI and PM2.5 hourly, so short intervals mostly refresh weather readings. The public API allows 6 requests per 10 seconds.</p>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.persona">Assistant</legend>
+      <div class="persona-grid" id="set-persona"></div>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.voice">Voice</legend>
+      <label class="switch"><input type="checkbox" id="set-voice-on"><span class="switch-ui" aria-hidden="true"></span><span data-i18n="set.voiceOn">Speak replies and tour steps</span></label>
+      <div class="seg seg-wide" id="set-gender">
+        <button type="button" data-gender="female" aria-pressed="true" data-i18n="set.female">Female</button>
+        <button type="button" data-gender="male" aria-pressed="false" data-i18n="set.male">Male</button>
+        <span class="seg-thumb" aria-hidden="true"></span>
+      </div>
+      <label class="range"><span data-i18n="set.rate">Speaking speed</span><input type="range" id="set-rate" min="0.8" max="1.2" step="0.05"></label>
+      <p class="field-help" id="voice-help"></p>
+      <button type="button" class="btn btn-ghost" id="voice-test"><svg><use href="#i-play"/></svg><span data-i18n="set.test">Play a sample</span></button>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.alerts">Alerts</legend>
+      <label class="switch"><input type="checkbox" id="set-announce"><span class="switch-ui" aria-hidden="true"></span><span data-i18n="set.announce">Announce when the PSI or PM2.5 band changes</span></label>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.data">Data</legend>
+      <div class="sources-status" id="sources-status"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" id="set-refresh"><svg><use href="#i-refresh"/></svg><span data-i18n="set.refresh">Refresh now</span></button>
+        <button type="button" class="btn btn-ghost" id="set-demo" data-i18n="set.demoOn">Use demo data</button>
+        <button type="button" class="btn btn-ghost" id="set-clear" data-i18n="set.clear">Clear saved readings</button>
+      </div>
+    </fieldset>
+    <fieldset class="field">
+      <legend data-i18n="set.help">Help</legend>
+      <button type="button" class="btn" id="set-tour"><svg><use href="#i-play"/></svg><span data-i18n="set.tour">Replay the guided tour</span></button>
+    </fieldset>
+  </div>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
+
+<div class="tour" id="tour" hidden>
+  <div class="tour-shade" id="tour-shade"></div>
+  <div class="tour-ring" id="tour-ring"></div>
+  <div class="tour-card" id="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-body">
+    <div class="tour-top">
+      <span class="tour-step" id="tour-step"></span>
+      <button class="tour-skip" id="tour-skip" type="button" data-i18n="tour.skip">Skip tour</button>
+    </div>
+    <h2 class="tour-title" id="tour-title"></h2>
+    <p class="tour-body" id="tour-body"></p>
+    <div class="tour-extra" id="tour-extra"></div>
+    <div class="tour-nav">
+      <div class="tour-dots" id="tour-dots" aria-hidden="true"></div>
+      <button class="btn btn-ghost" id="tour-back" type="button" data-i18n="tour.back">Back</button>
+      <button class="btn btn-primary" id="tour-next" type="button" data-i18n="tour.next">Next</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="sr-only" id="sr-live" aria-live="assertive"></div>
+<noscript><p class="noscript">HazeScope SG needs JavaScript to load live readings.</p></noscript>
+</body>
+</html>
