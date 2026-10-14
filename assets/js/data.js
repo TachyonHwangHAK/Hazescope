@@ -6,7 +6,7 @@ import { sgtDateString, store } from './util.js';
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const reviver = (k, v) => (typeof v === 'string' && ISO_RE.test(v) ? new Date(v) : v);
 
-export const SOURCES = ['psi', 'pm', 'regional', 'windDirection', 'windSpeed', 'airTemperature', 'humidity', 'rainfall', 'twoHr', 'twentyFourHr', 'psiPrev', 'pmPrev'];
+export const SOURCES = ['psi', 'pm', 'regional', 'grid', 'windDirection', 'windSpeed', 'airTemperature', 'humidity', 'rainfall', 'twoHr', 'twentyFourHr', 'psiPrev', 'pmPrev'];
 
 export class DataController {
   constructor() {
@@ -77,6 +77,8 @@ export class DataController {
         this.status[key] = { ok: false, at: new Date(), error: e.kind || 'unknown', message: e.message };
       }
     }
+    // Save as each source arrives, so a page closed mid-refresh still keeps what it got.
+    if (this.status[key]?.ok) { clearTimeout(this._saveT); this._saveT = setTimeout(() => this.saveCache(), 800); }
     this.emit(key);
   }
 
@@ -96,6 +98,7 @@ export class DataController {
     jobs.push(this._run('pm', () => api.fetchPM25(today)));
     // Regional model (different host, not limited)
     if (!this.isFresh('regional', MIN_SOURCE_AGE.regional)) jobs.push(this._run('regional', () => api.fetchRegional()));
+    if (!this.isFresh('grid', MIN_SOURCE_AGE.grid)) jobs.push(this._run('grid', () => api.fetchGrid()));
     // Priority 2: MSS observations
     jobs.push(this._run('windDirection', () => api.fetchStations('windDirection')));
     jobs.push(this._run('windSpeed', () => api.fetchStations('windSpeed')));

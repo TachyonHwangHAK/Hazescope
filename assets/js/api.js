@@ -1,5 +1,5 @@
 // Data access: rate-limited fetch, response normalisation.
-import { ENDPOINTS, OPEN_METEO_AQ, RATE_LIMIT, REQUEST_TIMEOUT_MS, CITIES } from './config.js';
+import { ENDPOINTS, OPEN_METEO_AQ, RATE_LIMIT, REQUEST_TIMEOUT_MS, CITIES, HAZE_GRID, HAZE_HOURS } from './config.js';
 import { parseDate, isNum } from './util.js';
 
 export class ApiError extends Error {
@@ -223,4 +223,43 @@ export async function fetchRegional() {
       next24: series,
     };
   });
+}
+
+// --- Regional haze field (Open-Meteo / CAMS grid) -----------------------------------------
+export function gridAxes() {
+  const { latN, latS, lonW, lonE, step } = HAZE_GRID;
+  const lats = [], lons = [];
+  for (let la = latN; la >= latS - 1e-9; la -= step) lats.push(+la.toFixed(4));
+  for (let lo = lonW; lo <= lonE + 1e-9; lo += step) lons.push(+lo.toFixed(4));
+  return { lats, lons };
+}
+
+export async function fetchGrid() {
+  const { lats, lons } = gridAxes();
+  const pts = [];
+  for (const la of lats) for (const lo of lons) pts.push([la, lo]);
+  const url = `${OPEN_METEO_AQ}?latitude=${pts.map((p) => p[0]).join(',')}&longitude=${pts.map((p) => p[1]).join(',')}` +
+    '&hourly=pm2_5&forecast_days=2';
+  const body = await getJSON(url, { limited: false });
+  if (body && body.error) throw new ApiError('payload', body.reason || 'Open-Meteo error');
+  const list = Array.isArray(body) ? body : [body];
+  if (list.length !== pts.length) throw new ApiError('payload', 'Unexpected grid size');
+  const times = ((list[0].hourly || {}).time || []).map((t) => parseDate(`${t}Z`));
+  const now = Date.now();
+  let k0 = 0;
+  times.forEach((t, k) => { if (t && t.getTime() <= now) k0 = k; });
+  const n = Math.min(HAZE_HOURS + 1, times.length - k0);
+  if (n < 1) throw new ApiError('empty', 'No grid hours');
+  const frames = [];
+  for (let h = 0; h < n; h++) {
+    const vals = new Float32Array(pts.length);
+    let sum = 0, cnt = 0;
+    const raw = list.map((loc) => num(((loc.hourly || {}).pm2_5 || [])[k0 + h]));
+    raw.forEach((v) => { if (v != null) { sum += v; cnt++; } });
+    if (!cnt) throw new ApiError('empty', 'Grid values missing');
+    const fill = sum / cnt;
+    raw.forEach((v, i) => { vals[i] = v == null ? fill : v; });
+    frames.push(Array.from(vals));
+  }
+  return { lats, lons, rows: lats.length, cols: lons.length, times: times.slice(k0, k0 + n), frames };
 }

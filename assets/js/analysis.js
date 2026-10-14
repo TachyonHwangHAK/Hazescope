@@ -106,7 +106,7 @@ export function summarize(raw) {
     return { ...r, ...c, dist, bearing: bear, upwind, band: pmBand(r.pm25) };
   });
 
-  return { psi, pm, pm24, psiItems, pmItems, temp, rh, wind, rain, twoHr, day, regional };
+  return { psi, pm, pm24, psiItems, pmItems, temp, rh, wind, rain, twoHr, day, regional, grid: raw.grid || null };
 }
 
 // Time series for the chart: last 24 hourly points per region.

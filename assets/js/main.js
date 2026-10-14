@@ -13,7 +13,7 @@ import { Assistant, PERSONAS } from './assistant.js';
 import { Tour } from './tutorial.js';
 
 // ---------------------------------------------------------------- settings
-const DEFAULTS = { lang: 'en', theme: 'dark', intervalMin: DEFAULT_INTERVAL_MIN, persona: 'aetherguard', voiceOn: true, gender: 'male', rate: 1, announce: true, tutorialDone: false };
+const DEFAULTS = { lang: 'en', theme: 'dark', basemap: 'terrain', hazeOn: true, intervalMin: DEFAULT_INTERVAL_MIN, persona: 'aetherguard', voiceOn: true, gender: 'male', rate: 1, announce: true, tutorialDone: false };
 const settings = { ...DEFAULTS, ...(store.get('settings') || {}) };
 if (!INTERVAL_CHOICES.includes(settings.intervalMin)) settings.intervalMin = DEFAULT_INTERVAL_MIN;
 if (!PERSONAS[settings.persona]) settings.persona = 'aetherguard';
@@ -39,8 +39,9 @@ const chart = new LineChart($('#chart'), $('#chart-legend'), $('#chart-table'), 
   lang: getLang,
   colors: () => SERIES_COLORS[['light', 'colourful'].includes(settings.theme) ? 'light' : 'dark'],
 });
-const map = new MapView($('#map'), $('#map-fallback'), $('#map-legend'), {
-  t, compass: compassPoint,
+const map = new MapView($('#map'), $('#map-fallback'), {
+  t, compass: compassPoint, basemap: settings.basemap,
+  onTimeline: (tl) => renderTimeline(tl),
   regionPos: () => ({ ...REGION_FALLBACK_POS, ...(data.raw.psi?.regions || data.raw.psiPrev?.regions || {}) }),
   onViewChange: (v) => setMapView(v),
 });
@@ -75,7 +76,6 @@ function setTheme(theme) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', { dark: '#0c1524', light: '#edf2f7', colourful: '#fff6ee', glass: '#071320' }[theme]);
   sky.setTheme(theme, cssVar('--bg'));
-  map.setTheme(theme);
   $$('[data-theme-opt]').forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.themeOpt === theme)); b.setAttribute('aria-checked', String(b.dataset.themeOpt === theme)); });
   if (chart.data) chart.refreshLabels();
 }
@@ -93,6 +93,7 @@ onLangChange(() => {
   updateVoiceHelp(); updateDemoButton();
   render();
   map.refreshLabels();
+  renderTimeline(map.timeline());
   refreshAllSegs();
 });
 
@@ -366,7 +367,7 @@ function renderStatus() {
   pill.dataset.state = st;
   $('#status-text').textContent = t('status.' + st);
   const remain = nextFetchAt - Date.now();
-  $('#status-count').textContent = st === 'loading' ? '' : fmtCountdown(remain);
+  $('#status-count').textContent = st === 'loading' || st === 'offline' ? '' : fmtCountdown(remain);
   pill.title = t('status.title', { cd: fmtCountdown(remain) });
 }
 
@@ -475,6 +476,62 @@ function trapFocus(container, e) {
   else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
 }
 
+// ---------------------------------------------------------------- haze timeline & basemap
+let playTimer = 0;
+function setBasemap(kind) {
+  settings.basemap = kind; saveSettings();
+  $$('#basemap-seg [data-basemap]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.basemap === kind)));
+  updateSeg($('#basemap-seg'));
+  map.setBasemap(kind);
+}
+function timelineLabel(h) {
+  const tl = map.timeline();
+  const when = $('#haze-when'), what = $('#haze-what');
+  if (!tl.available) { when.textContent = t('map.noGridTitle'); what.textContent = t('map.noGrid'); return; }
+  if (h <= 0) { when.textContent = t('map.now'); what.textContent = t('map.nowDetail'); return; }
+  const tm = map.timeAt(h);
+  when.textContent = t('map.ahead', { h, time: tm ? fmtTime(tm, getLang()) : '' });
+  what.textContent = t('map.aheadDetail');
+}
+function renderTimeline(tl) {
+  const slider = $('#haze-slider');
+  slider.disabled = !tl.available; $('#haze-play').disabled = !tl.available;
+  slider.max = String(tl.available ? tl.max : 0);
+  if (+slider.value > tl.max) slider.value = String(tl.max);
+  const ticks = $('#haze-ticks');
+  if (tl.available && tl.max > 0) {
+    const marks = [];
+    for (let k = 0; k <= tl.max; k += 6) marks.push(k);
+    ticks.replaceChildren(...marks.map((k) => h('span', { style: { left: `${(k / tl.max) * 100}%` }, text: k === 0 ? t('map.now') : fmtTime(map.timeAt(k), getLang()) })));
+  } else ticks.replaceChildren();
+  slider.style.setProperty('--fill', `${tl.max ? (+slider.value / tl.max) * 100 : 0}%`);
+  timelineLabel(+slider.value);
+}
+function setHazeHour(hh, { fromPlay = false } = {}) {
+  const slider = $('#haze-slider');
+  slider.value = String(hh);
+  slider.style.setProperty('--fill', `${+slider.max ? (hh / +slider.max) * 100 : 0}%`);
+  map.setTime(hh);
+  timelineLabel(hh);
+  if (!fromPlay) stopPlay();
+}
+function stopPlay() {
+  clearInterval(playTimer); playTimer = 0;
+  const b = $('#haze-play'); b.innerHTML = '<svg><use href="#i-play"/></svg>'; b.setAttribute('aria-label', t('map.play'));
+}
+function togglePlay() {
+  if (playTimer) { stopPlay(); return; }
+  const slider = $('#haze-slider'); const max = +slider.max; if (!max) return;
+  if (+slider.value >= max) setHazeHour(0, { fromPlay: true });
+  const b = $('#haze-play'); b.innerHTML = '<svg><use href="#i-pause"/></svg>'; b.setAttribute('aria-label', t('map.pause'));
+  let hold = 0;
+  playTimer = setInterval(() => {
+    const v = +slider.value;
+    if (v >= max) { if (++hold > 2) { hold = 0; setHazeHour(0, { fromPlay: true }); } return; }
+    setHazeHour(v + 1, { fromPlay: true });
+  }, prefersReducedMotion() ? 1200 : 650);
+}
+
 function setMapView(v) {
   mapView = v;
   $$('#map-seg button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === v)));
@@ -545,6 +602,10 @@ function wire() {
 
   // Map & chart segs
   $$('#map-seg button').forEach((b) => b.addEventListener('click', () => setMapView(b.dataset.view)));
+  $$('#basemap-seg [data-basemap]').forEach((b) => b.addEventListener('click', () => setBasemap(b.dataset.basemap)));
+  $('#haze-slider').addEventListener('input', (e) => setHazeHour(+e.target.value));
+  $('#haze-play').addEventListener('click', togglePlay);
+  $('#haze-on').addEventListener('change', (e) => { settings.hazeOn = e.target.checked; saveSettings(); map.setHazeVisible(settings.hazeOn); });
   $$('#trend-seg button').forEach((b) => b.addEventListener('click', () => {
     metric = b.dataset.metric;
     $$('#trend-seg button').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
@@ -619,7 +680,9 @@ async function boot() {
   data.loadCache();
   render();
   sky.start();
-  map.init(settings.theme).then(() => { map.setView(mapView, { animate: false }); map.update(S); });
+  map.init(); map.setHazeVisible(settings.hazeOn); map.setView(mapView, { animate: false }); map.update(S);
+  $('#haze-on').checked = settings.hazeOn;
+  setBasemap(settings.basemap);
   requestAnimationFrame(refreshAllSegs);
   if (document.fonts?.ready) document.fonts.ready.then(refreshAllSegs);
 

@@ -37,6 +37,7 @@ export const DEFAULT_INTERVAL_MIN = 5;
 export const MIN_SOURCE_AGE = {
   twentyFourHr: 15 * 60_000,
   regional: 10 * 60_000, // CAMS global updates every 12 h; hourly values change on the hour
+  grid: 30 * 60_000,     // 96 model points per request: keep well inside Open-Meteo's free daily allowance
 };
 
 export const NEA_REGIONS = ['north', 'south', 'east', 'west', 'central'];
@@ -103,21 +104,34 @@ export const SERIES_COLORS = {
   dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'],
 };
 
-// Map basemaps (CARTO, OSM data). Attribution is mandatory.
-export const BASEMAPS = {
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  voyager: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+// Online basemaps (used when reachable; the embedded offline basemap sits underneath).
+export const ONLINE_TILES = {
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    maxNativeZoom: 18,
+    attribution: '&copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a>, Maxar, Earthstar Geographics',
+  },
+  labels: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    maxNativeZoom: 18,
+    attribution: '',
+  },
+  terrain: {
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    subdomains: 'abc', maxNativeZoom: 17,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>, SRTM, <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA)',
+  },
 };
-export const BASEMAP_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
+export const OFFLINE_ATTRIBUTION = {
+  satellite: 'NASA Blue Marble',
+  terrain: 'Natural Earth relief',
+  borders: 'Natural Earth',
+  haze: 'CAMS/Open-Meteo, NEA',
+};
 
-export const LEAFLET = {
-  css: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  cssIntegrity: 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=',
-  js: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  jsIntegrity: 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=',
-};
+// CAMS model grid for the haze field (2° spacing; 96 points per request).
+export const HAZE_GRID = { latN: 7, latS: -7, lonW: 95, lonE: 117, step: 2 };
+export const HAZE_HOURS = 24;
 
 // Cross-reference thresholds
 export const XREF = {

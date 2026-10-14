@@ -1,6 +1,6 @@
 // Demo transport — synthetic data in the exact API shapes, for previews and tests.
 // Clearly labelled "Demo data" in the UI; never used unless the user opts in (?demo=1 or the button).
-import { NEA_REGIONS, REGION_FALLBACK_POS, CITIES } from './config.js';
+import { NEA_REGIONS, REGION_FALLBACK_POS } from './config.js';
 import { sgtDateString } from './util.js';
 
 const OFF = { north: -0.18, south: -0.05, east: 0.08, west: 0.16, central: 0.1 };
@@ -77,18 +77,36 @@ function twentyFour() {
       forecast: { code: 'HZ', text: 'Hazy' }, validPeriod: { start: now.toISOString(), end: now.toISOString(), text: '' },
       wind: { speed: { low: 10, high: 20 }, direction: 'SW' } }, periods: [] }] } };
 }
-function regional() {
-  const base = { sg: 92, jb: 98, btm: 85, mlk: 110, kl: 96, pku: 210, jbi: 245, plm: 280, mdn: 60, jkt: 48, ptk: 190, kch: 75, pky: 260, bsb: 30 };
+// Synthetic smoke plumes over Sumatra and Kalimantan drifting north-east with time.
+const PLUMES = [
+  { lat: -2.6, lon: 104.2, amp: 260, sx: 2.2, sy: 1.6 },
+  { lat: 0.4, lon: 101.6, amp: 190, sx: 1.6, sy: 1.4 },
+  { lat: -1.8, lon: 113.5, amp: 240, sx: 2.4, sy: 1.8 },
+  { lat: 0.0, lon: 109.6, amp: 150, sx: 1.4, sy: 1.2 },
+];
+function plume(lat, lon, hoursAhead) {
+  let v = 22;
+  for (const p of PLUMES) {
+    const shift = hoursAhead * 0.035; // degrees per hour toward NE
+    const dx = (lon - (p.lon + shift)) / p.sx, dy = (lat - (p.lat + shift * 0.6)) / p.sy;
+    v += p.amp * Math.exp(-(dx * dx + dy * dy) / 2) * (1 + 0.15 * Math.sin(hoursAhead / 3));
+  }
+  // light background haze reaching Singapore
+  v += 55 * Math.exp(-(((lon - 103.8) / 2.5) ** 2 + ((lat - 1.3) / 2) ** 2) / 2);
+  return Math.round(v);
+}
+function regional(u) {
+  const lats = (u.searchParams.get('latitude') || '').split(',').map(Number);
+  const lons = (u.searchParams.get('longitude') || '').split(',').map(Number);
   const start = new Date(); start.setUTCMinutes(0, 0, 0);
-  return CITIES.map((c) => {
-    const times = [], vals = [];
-    for (let i = -2; i < 46; i++) {
-      const t = new Date(start.getTime() + i * 3600_000);
-      times.push(t.toISOString().slice(0, 16));
-      vals.push(Math.round(base[c.id] * (1 + 0.25 * Math.sin(i / 4 + c.lat))));
-    }
-    return { latitude: c.lat, longitude: c.lon, current: { time: start.toISOString().slice(0, 16), pm2_5: base[c.id], pm10: Math.round(base[c.id] * 1.3), us_aqi: Math.min(500, Math.round(base[c.id] * 1.4 + 20)), carbon_monoxide: 300 + base[c.id] * 4 },
-      hourly: { time: times, pm2_5: vals } };
+  const withCurrent = u.searchParams.has('current');
+  return lats.map((la, k) => {
+    const lo = lons[k]; const times = [], vals = [];
+    for (let i = -2; i < 46; i++) { times.push(new Date(start.getTime() + i * 3600_000).toISOString().slice(0, 16)); vals.push(plume(la, lo, Math.max(0, i))); }
+    const now = plume(la, lo, 0);
+    const out = { latitude: la, longitude: lo, hourly: { time: times, pm2_5: vals } };
+    if (withCurrent) out.current = { time: start.toISOString().slice(0, 16), pm2_5: now, pm10: Math.round(now * 1.3), us_aqi: Math.min(500, Math.round(now * 1.4 + 20)), carbon_monoxide: 300 + now * 4 };
+    return out;
   });
 }
 
@@ -98,7 +116,7 @@ export async function demoTransport(url) {
   const date = u.searchParams.get('date') || sgtDateString();
   const p = u.pathname;
   let body;
-  if (u.hostname.includes('open-meteo')) body = regional();
+  if (u.hostname.includes('open-meteo')) body = regional(u);
   else if (p.endsWith('/psi')) body = psi(date);
   else if (p.endsWith('/pm25')) body = pm25(date);
   else if (p.endsWith('/wind-direction')) body = stations('windDirection');
