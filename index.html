@@ -13,7 +13,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://api-open.data.gov.sg" crossorigin>
+<link rel="preconnect" href="https://air-quality-api.open-meteo.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400..700&display=swap">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="assets/css/app.css">
 <script>
   // Apply saved theme/language before first paint to avoid a flash.
@@ -26,6 +28,8 @@
     } catch (e) {}
   })();
 </script>
+<script src="vendor/leaflet/leaflet.js" defer></script>
+<script src="assets/map/basemap-data.js" defer></script>
 <script type="module" src="assets/js/main.js"></script>
 </head>
 <body>
@@ -57,6 +61,7 @@
     <symbol id="i-alert2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 7.5v5.5M12 16.3v.1"/></symbol>
     <symbol id="i-skull" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3Z"/><path stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="m9 9 6 6m0-6-6 6"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13l10.5-6.5Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z"/></symbol>
     <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-5-5 5 5-5 5"/></symbol>
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5Zm6.5 12c.3 2 1.2 3 3 3.3-1.8.3-2.7 1.3-3 3.2-.3-1.9-1.2-2.9-3-3.2 1.8-.3 2.7-1.3 3-3.3Z"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.8 4.5 5.8v5.7c0 4.6 3.2 8.3 7.5 9.7 4.3-1.4 7.5-5.1 7.5-9.7V5.8Z" opacity=".95"/></symbol>
@@ -180,9 +185,25 @@
         <div id="map" class="map" role="region" aria-label="Map" data-i18n-attr="aria-label:map.aria"></div>
         <div class="map-fallback" id="map-fallback" hidden>
           <svg><use href="#i-map"/></svg>
-          <p data-i18n="map.fallback">The map could not load. Readings are listed beside it.</p>
+          <p data-i18n="map.fallback">The map could not load. Readings are listed below.</p>
         </div>
-        <div class="map-legend" id="map-legend"></div>
+        <div class="map-overlay map-basemap seg" id="basemap-seg" role="group" aria-label="Basemap" data-i18n-attr="aria-label:map.basemap">
+          <button type="button" data-basemap="terrain" aria-pressed="true" data-i18n="map.terrain">Terrain</button>
+          <button type="button" data-basemap="satellite" aria-pressed="false" data-i18n="map.satellite">Satellite</button>
+          <span class="seg-thumb" aria-hidden="true"></span>
+        </div>
+        <p class="map-overlay map-source" id="map-source" data-state="offline" aria-live="polite"><i aria-hidden="true"></i><span>Offline basemap</span></p>
+        <div class="map-overlay map-legend" id="map-legend"></div>
+        <div class="map-probe" id="map-probe" hidden></div>
+      </div>
+      <div class="haze-timeline" id="haze-timeline">
+        <button class="icon-btn play-btn" id="haze-play" type="button" aria-label="Play the 24-hour forecast" data-i18n-attr="aria-label:map.play"><svg><use href="#i-play"/></svg></button>
+        <div class="tl-track">
+          <input type="range" id="haze-slider" min="0" max="24" step="1" value="0" aria-label="Forecast hour" data-i18n-attr="aria-label:map.slider">
+          <div class="tl-ticks" id="haze-ticks" aria-hidden="true"></div>
+        </div>
+        <div class="tl-label" aria-live="polite"><b id="haze-when">Now</b><small id="haze-what"></small></div>
+        <label class="switch tl-switch"><input type="checkbox" id="haze-on" checked><span class="switch-ui" aria-hidden="true"></span><span data-i18n="map.haze">Haze layer</span></label>
       </div>
       <ul class="region-list" id="region-list" aria-label="Regions"></ul>
     </section>
@@ -309,7 +330,7 @@
     <div>
       <p class="footer-title" data-i18n="foot.about">About these numbers</p>
       <p data-i18n="foot.disclaimer">HazeScope SG is an independent viewer of public data and is not affiliated with NEA or MSS. For official advisories, refer to haze.gov.sg and weather.gov.sg.</p>
-      <p class="fineprint" id="foot-attrib" data-i18n-html="foot.attrib">Air quality and weather: NEA &amp; MSS via data.gov.sg (Singapore Open Data Licence). Regional model: Copernicus Atmosphere Monitoring Service (CAMS) via Open-Meteo. Map: OpenStreetMap contributors, CARTO.</p>
+      <p class="fineprint" id="foot-attrib" data-i18n-html="foot.attrib">Air quality and weather: NEA &amp; MSS via data.gov.sg (Singapore Open Data Licence). Regional model: Copernicus Atmosphere Monitoring Service (CAMS) via Open-Meteo. Map: Leaflet; offline imagery NASA Blue Marble and Natural Earth; online tiles Esri and OpenTopoMap (OpenStreetMap contributors, SRTM).</p>
       <p class="fineprint">HazeScope SG v<span id="app-version">1.0.0</span></p>
     </div>
   </footer>
